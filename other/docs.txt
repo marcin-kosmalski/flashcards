@@ -1,0 +1,24 @@
+Architecture:
+Web app with static content running on s3 bucket
+Backend running on aws lambda, available over api gateway
+Data stored in dynamodb
+
+
+Features:
+Flashcard sets
+Contains multiple flashcards related to the topic
+Create, update and delete
+Add flashcard
+Suggest flashcard question, generate answer and it to set
+Import from csv file the questions
+Generate print ready set
+View flashcards
+Learn from flashcards
+
+next:
+- add generate print ready set button to set view
+
+Request from Hlv:
+The managed instance in devl has a power policy:
+Can we change this to every day between 7 AM and 11 PM, including weekends?
+The people that are testing it for the migration of the Swico tool are requesting this change.

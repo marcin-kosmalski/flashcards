@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcards</title>
+    <style>
+        .nav-buttons {
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .nav-button {
+            padding: 10px 20px;
+            margin-right: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        .nav-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav-buttons">
+        <button class="nav-button" id="setsButton" onclick="location.href='index.html'">Sets</button>
+        <button class="nav-button" onclick="showNewSetForm()">New set</button>
+        <button class="nav-button" id="trainButton" onclick="showTrainForm()" style="display: none;">Train</button>
+        <button class="nav-button" id="editButton" onclick="showEditForm()" style="display: none;">Edit</button>
+        <button class="nav-button" id="addFlashcardButton" onclick="addFlashcard()" style="display: none;">Add flashcard</button>
+        <button class="nav-button" id="suggestFlashcardsButton" onclick="suggestFlashcards()" style="display: none;">Suggest flashcards</button>
+        <button class="nav-button" id="deleteButton" style="display: none;">Delete set</button>
+        <script>
+            function showNewSetForm() {
+                const contentDiv = document.getElementById('content');
+                // Clear existing content
+                while (contentDiv.firstChild) {
+                    contentDiv.removeChild(contentDiv.firstChild);
+                }
+
+                // Create main container
+                const container = document.createElement('div');
+                container.style.padding = '20px';
+
+                // Create title
+                const title = document.createElement('h2');
+                title.textContent = 'Create New Set';
+                container.appendChild(title);
+
+                // Create name input section
+                const nameDiv = document.createElement('div');
+                nameDiv.style.marginBottom = '15px';
+                const nameLabel = document.createElement('label');
+                nameLabel.htmlFor = 'setName';
+                nameLabel.textContent = 'Name:';
+                const nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.id = 'setName';
+                nameInput.style.width = '300px';
+                nameInput.style.padding = '5px';
+                nameDiv.appendChild(nameLabel);
+                nameDiv.appendChild(document.createElement('br'));
+                nameDiv.appendChild(nameInput);
+                container.appendChild(nameDiv);
+
+                // Create description input section
+                const descDiv = document.createElement('div');
+                descDiv.style.marginBottom = '15px';
+                const descLabel = document.createElement('label');
+                descLabel.htmlFor = 'setDescription';
+                descLabel.textContent = 'Description:';
+                const descInput = document.createElement('textarea');
+                descInput.id = 'setDescription';
+                descInput.style.width = '300px';
+                descInput.style.height = '100px';
+                descInput.style.padding = '5px';
+                descDiv.appendChild(descLabel);
+                descDiv.appendChild(document.createElement('br'));
+                descDiv.appendChild(descInput);
+                container.appendChild(descDiv);
+
+                // Create set button
+                const createButton = document.createElement('button');
+                createButton.className = 'nav-button';
+                createButton.textContent = 'Create';
+                createButton.onclick = createSet;
+                
+
+                // Create file upload section
+                const uploadDiv = document.createElement('div');
+                uploadDiv.style.marginBottom = '15px';
+                const uploadLabel = document.createElement('label');
+                uploadLabel.htmlFor = 'fileUpload';
+                uploadLabel.textContent = 'Upload File:';
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.id = 'fileUpload';
+                fileInput.accept = '.txt';
+                const uploadButton = document.createElement('button');
+                uploadButton.className = 'nav-button';
+                uploadButton.textContent = 'Create from file';
+                uploadButton.onclick = async function uploadFile() {
+                    const fileInput = document.getElementById('fileUpload');
+                    const file = fileInput.files[0];
+                    if (!file) {
+                        showMessage('Please select a file', 'error');
+                        return;
+                    }
+
+                    document.getElementById('spinner').style.display = 'block';
+
+                    try {
+                        const formData = new FormData();
+                        formData.append('file', file);
+
+                        const response = await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards/fileupload', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+                        const filename = data.location.key;
+                        
+                        if (response.ok) {
+                            createSetDirect(filename);
+                        }
+                        showMessage(data, response.ok ? 'success' : 'error');
+                        if (response.ok) {
+                            setTimeout(() => {
+                                document.getElementById('setsButton').click();
+                            }, 2000);
+                        }
+                    } catch (error) {
+                        showMessage('Error uploading file: ' + error.message, 'error');
+                    } finally {
+                        document.getElementById('spinner').style.display = 'none';
+                    }
+                };
+                uploadDiv.appendChild(uploadLabel);
+                uploadDiv.appendChild(document.createElement('br'));
+                uploadDiv.appendChild(fileInput);
+                container.appendChild(uploadDiv);
+                container.appendChild(createButton);
+                container.appendChild(uploadButton);
+                
+                
+
+                // Create spinner
+                const spinner = document.createElement('div');
+                spinner.id = 'spinner';
+                spinner.style.display = 'none';
+                spinner.style.marginTop = '15px';
+                const spinnerInner = document.createElement('div');
+                spinnerInner.style.border = '4px solid #f3f3f3';
+                spinnerInner.style.borderTop = '4px solid #3498db';
+                spinnerInner.style.borderRadius = '50%';
+                spinnerInner.style.width = '30px';
+                spinnerInner.style.height = '30px';
+                spinnerInner.style.animation = 'spin 1s linear infinite';
+                spinner.appendChild(spinnerInner);
+                container.appendChild(spinner);
+
+                // Create message div
+                const messageDiv = document.createElement('div');
+                messageDiv.id = 'createSetMessage';
+                messageDiv.style.marginTop = '15px';
+                messageDiv.style.padding = '10px';
+                messageDiv.style.display = 'none';
+                container.appendChild(messageDiv);
+
+                // Add spinner animation style
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `;
+                container.appendChild(style);
+
+                contentDiv.appendChild(container);
+            }
+
+            async function createSet() {
+                createSetDirect()
+            }
+
+            async function createSetDirect(filename) {
+                const name = document.getElementById('setName').value;
+                const description = document.getElementById('setDescription').value;
+                
+                if (!name) {
+                    showMessage('Please enter a set name', 'error');
+                    return;
+                }
+
+                document.getElementById('spinner').style.display = 'block';
+                
+                try {
+                    const response = await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: btoa(unescape(encodeURIComponent(JSON.stringify({
+                            command: 'create_set',
+                            content: {
+                                name: name,
+                                description: description,
+                                filename: filename
+                            }
+                        }))))
+                    });
+                    
+                    const data = await response.json();
+                    showMessage(data, response.ok ? 'success' : 'error');
+                    if (response.ok) {
+                        setTimeout(() => {
+                            document.getElementById('setsButton').click();
+                        }, 2000);
+                    }
+                } catch (error) {
+                    showMessage('Error creating set: ' + error.message, 'error');
+                } finally {
+                    document.getElementById('spinner').style.display = 'none';
+                }
+            }
+
+            function showMessage(message, type) {
+                const messageDiv = document.getElementById('createSetMessage');
+                messageDiv.style.display = 'block';
+                messageDiv.style.backgroundColor = type === 'success' ? '#d4edda' : '#f8d7da';
+                messageDiv.style.color = type === 'success' ? '#155724' : '#721c24';
+                messageDiv.style.borderRadius = '4px';
+                messageDiv.textContent = message.error || message.msg;
+            }
+        </script>
+    </div>
+    
+    <div id="content">
+        <!-- Content will be loaded here -->
+    </div>
+</body>
+<script>
+    async function loadSets() {
+        const mdScript = document.createElement('script');
+        mdScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js';
+        document.head.appendChild(mdScript);
+        try {
+            const response = await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: btoa(unescape(encodeURIComponent(JSON.stringify({
+                    command: 'get_sets',
+                    content: ''
+                }))))
+            });
+            const data = await response.json();
+            const sets = data.msg;
+            
+            const contentDiv = document.getElementById('content');
+            if (sets.length === 0) {
+                contentDiv.innerHTML = '<p>No sets found. Create a new set to get started!</p>';
+                return;
+            }
+
+            const setsList = document.createElement('ul');
+            setsList.style.listStyle = 'none';
+            setsList.style.padding = '20px';
+
+            sets.forEach(set => {
+                const listItem = document.createElement('li');
+                listItem.style.padding = '10px';
+                listItem.style.margin = '10px 0';
+                listItem.style.backgroundColor = '#f8f9fa';
+                listItem.style.borderRadius = '4px';
+                listItem.style.cursor = 'pointer';
+
+                const setName = document.createElement('h3');
+                setName.textContent = set.name;
+                setName.style.margin = '0 0 5px 0';
+
+                const setDescription = document.createElement('p');
+                setDescription.textContent = set.description || 'No description';
+                setDescription.style.margin = '0';
+                setDescription.style.color = '#666';
+
+                // Add click handler to open set view
+                listItem.addEventListener('click', async () => {
+                    const contentDiv = document.getElementById('content');
+                    
+                    // Create set view container
+                    const setView = document.createElement('div');
+                    setView.style.padding = '20px';
+                    
+                    // Add set details
+                    const title = document.createElement('h2');
+                    title.textContent = set.name;
+                    title.style.margin = '0 0 20px 0';
+                    
+                    const description = document.createElement('p');
+                    description.textContent = set.description || 'No description';
+                    description.style.color = '#666';
+                    description.style.margin = '0 0 10px 0';
+                    
+                    const createdAt = document.createElement('p');
+                    createdAt.textContent = `Created: ${new Date(set.created_at).toLocaleDateString()}`;
+                    createdAt.style.color = '#666';
+                    createdAt.style.margin = '0 0 20px 0';
+                    if (set.content_path) {
+                        const contentPath = document.createElement('p');
+                        contentPath.textContent = `File Path: ${set.content_path}`;
+                        contentPath.style.color = '#666';
+                        contentPath.style.margin = '0 0 20px 0';
+                        setView.appendChild(contentPath);
+                    }
+
+                    // Create export button
+                    const exportButton = document.createElement('button');
+                    exportButton.className = 'nav-button';
+                    exportButton.textContent = 'Export Flashcards to CSV';
+                    exportButton.style.marginBottom = '20px';
+                    exportButton.onclick = async () => {
+                        try {
+                            const response = await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: btoa(unescape(encodeURIComponent(JSON.stringify({
+                                    command: 'export_flashcards_to_csv',
+                                    content: {
+                                        set_name: set.name
+                                    }
+                                }))))
+                            });
+
+                            const data = await response.json();
+                            if (response.ok) {
+                                const link = document.createElement('a');
+                                link.href = `${data.file_url}`;
+                                link.download = data.filename;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                alert('Flashcards exported successfully');
+                            } else {
+                                alert('Error exporting flashcards: ' + data.message);
+                            }
+                        } catch (error) {
+                            alert('Error exporting flashcards: ' + error.message);
+                        }
+                    };
+                    setView.appendChild(exportButton);
+                    // Create import button
+                    const importButton = document.createElement('button');
+                    importButton.className = 'nav-button';
+                    importButton.textContent = 'Import Flashcards from CSV';
+                    importButton.style.marginBottom = '20px';
+                    importButton.onclick = async () => {
+                        const fileInput = document.createElement('input');
+                        fileInput.type = 'file';
+                        fileInput.accept = '.csv';
+                        fileInput.onchange = async () => {
+                            const file = fileInput.files[0];
+                            if (!file) {
+                                alert('Please select a file');
+                                return;
+                            }
+
+                            const formData = new FormData();
+                            formData.append('file', file);
+
+                            try {
+                                const response = await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards/fileupload', {
+                                    method: 'POST',
+                                    body: formData
+                                });
+
+                                const data = await response.json();
+                                const filename = data.location.key;
+
+                                if (response.ok) {
+                                    await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: btoa(unescape(encodeURIComponent(JSON.stringify({
+                                            command: 'import_flashcards_from_csv',
+                                            content: {
+                                                set_name: set.name,
+                                                filename: filename
+                                            }
+                                        }))))
+                                    });
+                                    alert('Flashcards imported successfully');
+                                    document.getElementById('setsButton').click();
+                                } else {
+                                    alert('Error importing flashcards: ' + data.message);
+                                }
+                            } catch (error) {
+                                alert('Error uploading file: ' + error.message);
+                            }
+                        };
+                        fileInput.click();
+                    };
+                    setView.appendChild(importButton);
+
+
+
+                    // Load flashcards for this set
+                    try {
+                        const response = await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: btoa(unescape(encodeURIComponent(JSON.stringify({
+                                command: 'get_flashcards',
+                                content: {
+                                    set_name: set.name
+                                }
+                            }))))
+                        });
+                        const data = await response.json();
+                        const flashcards = data.msg;
+
+                        // Create flashcards container
+                        const flashcardsContainer = document.createElement('div');
+                        flashcardsContainer.style.display = 'grid';
+                        flashcardsContainer.style.gridTemplateColumns = 'repeat(auto-fill, minmax(300px, 1fr))';
+                        flashcardsContainer.style.gap = '20px';
+                        
+                        flashcards.forEach(card => {
+                            const cardElement = document.createElement('div');
+                            cardElement.style.padding = '15px';
+                            cardElement.style.backgroundColor = '#f8f9fa';
+                            cardElement.style.borderRadius = '4px';
+                            
+                            const front = document.createElement('div');
+                            front.style.marginBottom = '10px';
+                            front.innerHTML = `<strong>Front:</strong><br>${card.question}`;
+                            
+                            const back = document.createElement('div');
+                            back.innerHTML = `<strong>Back:</strong><br>${card.answer}`;
+                            
+                            cardElement.appendChild(front);
+                            cardElement.appendChild(back);
+                            flashcardsContainer.appendChild(cardElement);
+                        });
+
+                        setView.appendChild(title);
+                        setView.appendChild(description);
+                        setView.appendChild(createdAt);
+                        
+                        // Show train and edit buttons
+                        document.getElementById('trainButton').style.display = 'inline-block';
+                        document.getElementById('editButton').style.display = 'inline-block';
+                        document.getElementById('addFlashcardButton').style.display = 'inline-block';
+                        document.getElementById('deleteButton').style.display = 'inline-block';
+                        document.getElementById('suggestFlashcardsButton').style.display = 'inline-block';
+                        document.getElementById('trainButton').onclick = () => showTrainForm();
+                        document.getElementById('editButton').onclick = () => showEditForm();
+                        document.getElementById('addFlashcardButton').onclick = () => addFlashcard();
+                        document.getElementById('suggestFlashcardsButton').onclick = () => suggestFlashcards();
+                        document.getElementById('deleteButton').onclick = async () => { 
+                            if (confirm('Are you sure you want to delete this set? This action cannot be undone.')) {
+                                try {
+                                    const response = await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: btoa(unescape(encodeURIComponent(JSON.stringify({
+                                            command: 'delete_set_with_flashcards',
+                                            content: {
+                                                set_name: set.name
+                                            }
+                                        }))))
+                                    });
+
+                                    const data = await response.json();
+                                    if (response.ok) {
+                                        // Hide action buttons
+                                        document.getElementById('trainButton').style.display = 'none';
+                                        document.getElementById('editButton').style.display = 'none';
+                                        document.getElementById('addFlashcardButton').style.display = 'none';
+                                        document.getElementById('deleteButton').style.display = 'none';
+                                        document.getElementById('suggestFlashcardsButton').style.display = 'none';
+                                        // Show success message and redirect
+                                        alert('Set deleted successfully');
+                                        loadSets();
+                                    } else {
+                                        alert('Error deleting set: ' + data.msg);
+                                    }
+                                } catch (error) {
+                                    console.error('Error deleting set:', error);
+                                    alert('Error deleting set. Please try again later.');
+                                }
+                            }
+                        };
+               
+
+                        async function suggestFlashcards() {
+                            try {
+                                const response = await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: btoa(unescape(encodeURIComponent(JSON.stringify({
+                                        command: 'suggest_flashcards',
+                                        content: {
+                                            set_name: set.name
+                                        }
+                                    }))))
+                                });
+
+                                const data = await response.json();
+                                if (response.ok) {
+                                    alert('Flashcards suggested successfully');
+                                    loadSets();
+                                } else {
+                                    alert('Error suggesting flashcards: ' + data.msg);
+                                }
+                            } catch (error) {
+                                console.error('Error suggesting flashcards:', error);
+                                alert('Error suggesting flashcards. Please try again later.');
+                            }
+                        }
+                        
+                        function addFlashcard() {
+                            const contentDiv = document.getElementById('content');
+                            const addView = document.createElement('div');
+                            addView.style.padding = '20px';
+                            addView.style.maxWidth = '600px';
+                            addView.style.margin = '0 auto';
+
+                            const title = document.createElement('h2');
+                            title.textContent = 'Add New Flashcard';
+                            addView.appendChild(title);
+
+                            const form = document.createElement('div');
+                            form.style.display = 'grid';
+                            form.style.gap = '20px';
+
+                            // Question inpu
+                            const questionLabel = document.createElement('label');
+                            questionLabel.textContent = 'Question:';
+                            const questionInput = document.createElement('textarea');
+                            questionInput.style.width = '100%';
+                            questionInput.style.padding = '8px';
+                            questionInput.style.borderRadius = '4px';
+                            questionInput.style.border = '1px solid #ced4da';
+                            questionInput.style.minHeight = '100px';
+
+                            // Answer input
+                            // Add suggest answer button
+                            const suggestButton = document.createElement('button');
+                            suggestButton.className = 'nav-button';
+                            suggestButton.textContent = 'Suggest Answer';
+                            suggestButton.style.marginTop = '10px';
+                            suggestButton.onclick = async () => {
+                                if (!questionInput.value.trim()) {
+                                    alert('Please enter a question first');
+                                    return;
+                                }
+                                
+                                suggestButton.disabled = true;
+                                suggestButton.textContent = 'Getting suggestion...';
+                                
+                                try {
+                                    const response = await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: btoa(unescape(encodeURIComponent(JSON.stringify({
+                                            command: 'suggest_flashcard_answer',
+                                            content: {
+                                                question: questionInput.value
+                                            }
+                                        }))))
+                                    });
+
+                                    if (response.ok) {
+                                        const data = await response.json();
+                                        // Convert markdown to HTML
+                                        const md = window.markdownit();
+                                        const htmlContent = md.render(data.msg);
+                                        answerInput.value = data.msg; // Store raw markdown
+                                        
+                                        // Create preview div
+                                        const previewDiv = document.createElement('div');
+                                        previewDiv.innerHTML = '<strong>Preview:</strong>';
+                                        const preview = document.createElement('div');
+                                        preview.innerHTML = htmlContent;
+                                        preview.style.border = '1px solid #ced4da';
+                                        preview.style.borderRadius = '4px';
+                                        preview.style.padding = '8px';
+                                        preview.style.marginTop = '10px';
+                                        previewDiv.appendChild(preview);
+                                        
+                                        // Insert preview before the answer input
+                                        form.insertBefore(previewDiv, answerLabel);
+                                    } else {
+                                        console.error('Failed to get suggestion');
+                                        alert('Failed to get suggestion. Please try again.');
+                                    }
+                                } catch (error) {
+                                    console.error('Error getting suggestion:', error);
+                                    alert('Error getting suggestion. Please try again.');
+                                } finally {
+                                    suggestButton.disabled = false;
+                                    suggestButton.textContent = 'Suggest Answer';
+                                }
+                            };
+
+                           
+
+                            form.appendChild(suggestButton);
+                            const answerLabel = document.createElement('label');
+                            answerLabel.textContent = 'Answer:';
+                            const answerInput = document.createElement('textarea');
+                            answerInput.style.width = '100%';
+                            answerInput.style.padding = '8px';
+                            answerInput.style.borderRadius = '4px';
+                            answerInput.style.border = '1px solid #ced4da';
+                            answerInput.style.minHeight = '100px';
+
+                            // Save button
+                            const saveButton = document.createElement('button');
+                            saveButton.className = 'nav-button';
+                            saveButton.textContent = 'Save Flashcard';
+                            saveButton.onclick = async () => {
+                                try {
+                                    const response = await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: btoa(unescape(encodeURIComponent(JSON.stringify({
+                                            command: 'add_flashcard',
+                                            content: {
+                                                set_name: set.name,
+                                                question: questionInput.value,
+                                                answer: answerInput.value
+                                            }
+                                        }))))
+                                    });
+
+                                    if (response.ok) {
+                                        // Refresh the set view to show new flashcard
+                                        document.getElementById('setsButton').click();
+                                    } else {
+                                        console.error('Failed to save flashcard');
+                                    }
+                                } catch (error) {
+                                    console.error('Error saving flashcard:', error);
+                                }
+                            };
+
+                            // Add elements to form
+                            form.appendChild(questionLabel);
+                            form.appendChild(questionInput);
+                            form.appendChild(answerLabel);
+                            form.appendChild(answerInput);
+                            form.appendChild(saveButton);
+
+                            addView.appendChild(form);
+
+                            contentDiv.innerHTML = '';
+                            contentDiv.appendChild(addView);
+                        }
+
+                        
+                        
+                        // Add edit functionality
+                        function showEditForm() {
+                            const contentDiv = document.getElementById('content');
+                            const editView = document.createElement('div');
+                            editView.style.padding = '20px';
+
+                            const title = document.createElement('h2');
+                            title.textContent = 'Edit Flashcards';
+                            editView.appendChild(title);
+
+                            const cardsContainer = document.createElement('div');
+                            cardsContainer.style.display = 'grid';
+                            cardsContainer.style.gridTemplateColumns = '1fr';
+                            cardsContainer.style.gap = '20px';
+                            cardsContainer.style.marginTop = '20px';
+
+                            flashcards.forEach((card, index) => {
+                                const cardEditor = document.createElement('div');
+                                cardEditor.style.padding = '20px';
+                                cardEditor.style.backgroundColor = '#f8f9fa';
+                                cardEditor.style.borderRadius = '4px';
+                                cardEditor.style.position = 'relative';
+
+                                const questionInput = document.createElement('textarea');
+                                questionInput.value = card.question;
+                                questionInput.style.width = '100%';
+                                questionInput.style.marginBottom = '10px';
+                                questionInput.style.padding = '8px';
+                                questionInput.style.borderRadius = '4px';
+                                questionInput.style.border = '1px solid #ced4da';
+
+                                const answerInput = document.createElement('textarea');
+                                answerInput.value = card.answer;
+                                answerInput.style.width = '100%';
+                                answerInput.style.padding = '8px';
+                                answerInput.style.borderRadius = '4px';
+                                answerInput.style.border = '1px solid #ced4da';
+
+                                const buttonContainer = document.createElement('div');
+                                buttonContainer.style.marginTop = '10px';
+                                buttonContainer.style.display = 'flex';
+                                buttonContainer.style.gap = '10px';
+
+                                const saveButton = document.createElement('button');
+                                saveButton.className = 'nav-button';
+                                saveButton.textContent = 'Save';
+                                saveButton.onclick = async () => {
+                                    try {
+                                        const response = await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json'
+                                            },
+                                            body: btoa(unescape(encodeURIComponent(JSON.stringify({
+                                                command: 'update_flashcard',
+                                                content: {
+                                                    set_name: set.name,
+                                                    id: card.id,
+                                                    question: questionInput.value,
+                                                    answer: answerInput.value
+                                                }
+                                            }))))
+                                        });
+                                        const data = await response.json();
+                                        if (data.msg) {
+                                            cardEditor.style.backgroundColor = '#d4edda';
+                                            setTimeout(() => {
+                                                cardEditor.style.backgroundColor = '#f8f9fa';
+                                            }, 1000);
+                                        }
+                                    } catch (error) {
+                                        console.error('Error updating flashcard:', error);
+                                    }
+                                };
+
+                                const deleteButton = document.createElement('button');
+                                deleteButton.className = 'nav-button';
+                                deleteButton.textContent = 'Delete';
+                                deleteButton.style.backgroundColor = '#dc3545';
+                                deleteButton.onclick = async () => {
+                                    if (confirm('Are you sure you want to delete this flashcard?')) {
+                                        try {
+                                            const response = await fetch('http://helvetia-ai-alb-1572264382.eu-central-1.elb.amazonaws.com/flashcards', {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json'
+                                                },
+                                                body: btoa(unescape(encodeURIComponent(JSON.stringify({
+                                                    command: 'delete_flashcard',
+                                                    content: {
+                                                        set_name: set.name,
+                                                        id: card.id
+                                                    }
+                                                }))))
+                                            });
+                                            const data = await response.json();
+                                            if (data.msg) {
+                                                cardEditor.remove();
+                                            }
+                                        } catch (error) {
+                                            console.error('Error deleting flashcard:', error);
+                                        }
+                                    }
+                                };
+
+                                buttonContainer.appendChild(saveButton);
+                                buttonContainer.appendChild(deleteButton);
+                                cardEditor.appendChild(questionInput);
+                                cardEditor.appendChild(answerInput);
+                                cardEditor.appendChild(buttonContainer);
+                                cardsContainer.appendChild(cardEditor);
+                            });
+
+                            editView.appendChild(cardsContainer);
+                            contentDiv.innerHTML = '';
+                            contentDiv.appendChild(editView);
+                        }
+                        // Add train functionality
+                        function showTrainForm() {
+                            const contentDiv = document.getElementById('content');
+                            const flashcards = [...flashcardsContainer.children].sort(() => Math.random() - 0.5);
+                            let currentCardIndex = 0;
+
+                            function showCurrentCard() {
+                                const trainView = document.createElement('div');
+                                trainView.style.padding = '20px';
+                                trainView.style.maxWidth = '600px';
+                                trainView.style.margin = '0 auto';
+
+                                const card = flashcards[currentCardIndex];
+                                const question = card.children[0].textContent.replace('Front:', '').trim();
+                                const answer = card.children[1].textContent.replace('Back:', '').trim();
+
+                                const questionDiv = document.createElement('div');
+                                questionDiv.style.fontSize = '1.2em';
+                                questionDiv.style.marginBottom = '20px';
+                                questionDiv.style.padding = '20px';
+                                questionDiv.style.backgroundColor = '#f8f9fa';
+                                questionDiv.style.borderRadius = '4px';
+                                questionDiv.innerHTML = `<strong>Question:</strong><br>${question}`;
+
+                                const answerDiv = document.createElement('div');
+                                answerDiv.classList.add('markdown-body');
+                                answerDiv.style.display = 'none';
+                                answerDiv.style.marginBottom = '20px';
+                                answerDiv.style.padding = '20px';
+                                answerDiv.style.backgroundColor = '#e9ecef';
+                                answerDiv.style.borderRadius = '4px';
+                                // Add marked.js for markdown parsing
+                                // Convert markdown to HTML
+
+                                const md = window.markdownit();
+                                const htmlContent = md.render(answer);
+                                answerDiv.innerHTML = `<strong>Answer:</strong><br>${htmlContent}`;
+
+                                const buttonContainer = document.createElement('div');
+                                buttonContainer.style.display = 'flex';
+                                buttonContainer.style.gap = '10px';
+                                buttonContainer.style.justifyContent = 'center';
+
+                                const showAnswerBtn = document.createElement('button');
+                                showAnswerBtn.className = 'nav-button';
+                                showAnswerBtn.textContent = 'Show Answer';
+                                showAnswerBtn.onclick = () => {
+                                    answerDiv.style.display = 'block';
+                                    showAnswerBtn.style.display = 'none';
+                                };
+
+                                const nextBtn = document.createElement('button');
+                                nextBtn.className = 'nav-button';
+                                nextBtn.textContent = currentCardIndex === flashcards.length - 1 ? 'Finish' : 'Next';
+                                nextBtn.onclick = () => {
+                                    if (currentCardIndex < flashcards.length - 1) {
+                                        currentCardIndex++;
+                                        showCurrentCard();
+                                    } else {
+                                        // Return to standard view
+                                        document.getElementById('trainButton').style.display = 'none';
+                                        document.getElementById('editButton').style.display = 'none';
+                                        document.getElementById('addFlashcardButton').style.display = 'none';
+                                        document.getElementById('deleteButton').style.display = 'none';
+                                        document.getElementById('suggestFlashcardsButton').style.display = 'none';
+                                        loadSets();
+                                    }
+                                };
+
+                                const progress = document.createElement('div');
+                                progress.style.marginBottom = '20px';
+                                progress.style.textAlign = 'center';
+                                progress.textContent = `Card ${currentCardIndex + 1} of ${flashcards.length}`;
+
+                                trainView.appendChild(progress);
+                                trainView.appendChild(questionDiv);
+                                trainView.appendChild(answerDiv);
+                                buttonContainer.appendChild(showAnswerBtn);
+                                buttonContainer.appendChild(nextBtn);
+                                trainView.appendChild(buttonContainer);
+
+                                contentDiv.innerHTML = '';
+                                contentDiv.appendChild(trainView);
+                            }
+
+                            if (flashcards.length > 0) {
+                                showCurrentCard();
+                            } else {
+                                contentDiv.innerHTML = '<p>No flashcards available for training.</p>';
+                            }
+                        }
+                        setView.appendChild(flashcardsContainer);
+                        
+                        contentDiv.innerHTML = '';
+                        contentDiv.appendChild(setView);
+                    } catch (error) {
+                        console.error('Error loading flashcards:', error);
+                        contentDiv.innerHTML = '<p>Error loading flashcards. Please try again later.</p>';
+                    }
+                });
+
+                listItem.appendChild(setName);
+                listItem.appendChild(setDescription);
+                setsList.appendChild(listItem);
+            });
+
+            contentDiv.innerHTML = '';
+            contentDiv.appendChild(setsList);
+        } catch (error) {
+            console.error('Error loading sets:', error);
+            document.getElementById('content').innerHTML = '<p>Error loading sets. Please try again later.</p>';
+        }
+    }
+
+    // Load sets when the page loads
+    window.onload = loadSets;
+</script>
+</html>
+
